@@ -1,0 +1,14 @@
+{
+  "transaction_type": "전세",
+  "max_deposit": 45000,
+  "max_maintenance_fee": 30,
+  "regions": ["강서구", "양천구", "영등포구"],
+  "commute_destination": "여의도역",
+  "max_commute_minutes": 40,
+  "property_types": ["아파트"],
+  "min_area_sqm": 84.0,
+  "min_households": 1000,
+  "min_built_year": 2010,
+  "require_parking": true,
+  "must_conditions": ["max_deposit", "min_area_sqm", "min_households"]
+}
