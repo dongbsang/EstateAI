@@ -1,0 +1,13 @@
+{
+  "cached_at": "2026-01-05T09:39:10.187007",
+  "params": {
+    "region": "11560",
+    "type": "매매",
+    "max_deposit": 90000,
+    "min_area": 59.0
+  },
+  "data": [
+    {
+      "id": "naver_2568563934",
+      "source": "네이버부동산",
+      "url": 

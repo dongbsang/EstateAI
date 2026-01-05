@@ -161,7 +161,7 @@ class Report(BaseModel):
         default_factory=list,
         description="탈락 매물"
     )
-    
+
     # 요약
     summary: str = Field(
         description="전체 요약",
