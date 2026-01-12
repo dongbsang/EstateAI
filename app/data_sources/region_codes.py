@@ -7,6 +7,85 @@ from typing import Optional
 from loguru import logger
 
 
+# 코드 → 이름 매핑 (역방향 조회용, 단일 소스)
+CODE_TO_NAME = {
+    # 서울
+    "11110": "종로구",
+    "11140": "중구",
+    "11170": "용산구",
+    "11200": "성동구",
+    "11215": "광진구",
+    "11230": "동대문구",
+    "11260": "중랑구",
+    "11290": "성북구",
+    "11305": "강북구",
+    "11320": "도봉구",
+    "11350": "노원구",
+    "11380": "은평구",
+    "11410": "서대문구",
+    "11440": "마포구",
+    "11470": "양천구",
+    "11500": "강서구",
+    "11530": "구로구",
+    "11545": "금천구",
+    "11560": "영등포구",
+    "11590": "동작구",
+    "11620": "관악구",
+    "11650": "서초구",
+    "11680": "강남구",
+    "11710": "송파구",
+    "11740": "강동구",
+    # 경기도
+    "41111": "수원 장안구",
+    "41113": "수원 권선구",
+    "41115": "수원 팔달구",
+    "41117": "수원 영통구",
+    "41131": "성남 수정구",
+    "41133": "성남 중원구",
+    "41135": "성남 분당구",
+    "41150": "의정부",
+    "41171": "안양 만안구",
+    "41173": "안양 동안구",
+    "41190": "부천",
+    "41210": "광명",
+    "41220": "평택",
+    "41271": "안산 상록구",
+    "41273": "안산 단원구",
+    "41281": "고양 덕양구",
+    "41285": "고양 일산동구",
+    "41287": "고양 일산서구",
+    "41290": "과천",
+    "41310": "구리",
+    "41360": "남양주",
+    "41390": "시흥",
+    "41410": "군포",
+    "41430": "의왕",
+    "41450": "하남",
+    "41461": "용인 처인구",
+    "41463": "용인 기흥구",
+    "41465": "용인 수지구",
+    "41480": "파주",
+    "41570": "김포",
+    "41590": "화성",
+    "41610": "경기광주",
+}
+
+
+def get_name_by_code(code: str) -> str:
+    """
+    지역 코드로 이름 조회
+
+    Args:
+        code: 시군구 코드 (5자리)
+
+    Returns:
+        지역명 (없으면 코드 그대로 반환)
+    """
+    # 5자리로 정규화
+    sigungu = code[:5] if len(code) > 5 else code
+    return CODE_TO_NAME.get(sigungu, code)
+
+
 class RegionCodeManager:
     """
     지역 코드 관리자
@@ -199,36 +278,10 @@ class RegionCodeManager:
 
         return codes
 
-    def get_gu_from_code(self, code: str) -> Optional[str]:
-        """코드에서 구 이름 추출"""
-        sigungu = code[:5]
-
-        for gu_name, gu_code in self.SEOUL_GU_CODES.items():
-            if gu_code == sigungu:
-                return gu_name
-
-        return None
+    def get_name_by_code(self, code: str) -> str:
+        """코드에서 지역 이름 조회 (모듈 함수 래퍼)"""
+        return get_name_by_code(code)
 
     def get_all_seoul_gu_codes(self) -> dict[str, str]:
         """서울시 전체 구 코드 반환"""
         return self.SEOUL_GU_CODES.copy()
-
-
-# 지역 코드 매니저 싱글톤 인스턴스
-_region_manager: Optional[RegionCodeManager] = None
-
-
-def get_region_code(gu_name: str) -> Optional[str]:
-    """
-    구 이름으로 시군구 코드 조회 (편의 함수)
-
-    Args:
-        gu_name: 구 이름 (예: "강서구", "양천구")
-
-    Returns:
-        시군구 코드 (5자리) 또는 None
-    """
-    global _region_manager
-    if _region_manager is None:
-        _region_manager = RegionCodeManager()
-    return _region_manager.get_sigungu_code(gu_name)

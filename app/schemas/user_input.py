@@ -22,27 +22,13 @@ class PropertyType(str, Enum):
     VILLA = "빌라"
 
 
-class Priority(str, Enum):
-    """조건 우선순위"""
-    MUST = "반드시"  # 필수 조건 - 미충족 시 탈락
-    PREFER = "선호"  # 선호 조건 - 점수에 반영
-
-
-class FilterCondition(BaseModel):
-    """개별 필터 조건"""
-    model_config = ConfigDict(use_enum_values=True)
-    
-    value: float | str | bool
-    priority: Priority = Priority.PREFER
-
-
 class UserInput(BaseModel):
     """
     사용자 입력 스키마
     
     모든 조건은 optional이며, 입력된 조건만 필터링에 사용됩니다.
-    priority가 "반드시"인 조건은 미충족 시 탈락,
-    "선호"인 조건은 점수 계산에만 반영됩니다.
+    must_conditions에 포함된 조건은 미충족 시 탈락,
+    그 외 조건은 점수 계산에만 반영됩니다.
     """
     model_config = ConfigDict(
         use_enum_values=True,

@@ -71,8 +71,8 @@ async def get_available_regions():
     manager = RegionCodeManager()
 
     return {
-        "seoul_gu": list(manager.SEOUL_GU_CODES.keys()),
-        "seoul_dong": list(manager.SEOUL_DONG_CODES.keys()),
+        "seoul": list(manager.SEOUL_GU_CODES.keys()),
+        "gyeonggi": list(manager.GYEONGGI_CODES.keys()),
     }
 
 

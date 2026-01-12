@@ -1,8 +1,9 @@
-"""
+﻿"""
 Pipeline Orchestrator
 Agent들의 실행 순서를 제어하고 결과를 조합합니다.
 """
 
+import time
 from loguru import logger
 from app.schemas.user_input import UserInput
 from app.schemas.results import Report, FilterStatus
@@ -20,19 +21,6 @@ from app.agents.report_agent import ReportAgent, ReportInput
 class PipelineOrchestrator:
     """
     파이프라인 오케스트레이터
-    전체 분석 파이프라인을 관리합니다:
-
-    [Phase 1: 수집 & 보강]
-    Search → Enrich (단지정보/실거래가) → Normalize
-
-    [Phase 2: 1차 필터링]
-    Filter (예산/면적/세대수 등 기본 조건)
-
-    [Phase 3: 통근 시간 계산] ← 필터 통과 매물만! (API 절약)
-    Commute → 2차 필터링 (통근 시간 조건)
-
-    [Phase 4: 분석 & 리포트]
-    Score → Risk → Question → Report
     """
 
     def __init__(self, max_items_per_region: int = 50):
@@ -57,42 +45,48 @@ class PipelineOrchestrator:
         """
         전체 파이프라인 실행
         """
-        self.logger.info("Starting automated pipeline")
+        pipeline_start = time.time()
+        print("\n" + "=" * 60)
+        print("🏠 PropLens 파이프라인 시작")
+        print("=" * 60)
 
-        # 1. 네이버 부동산에서 매물 자동 수집
-        self.logger.info("Step 1: Searching listings...")
+        # 1. 매물 검색
+        step_start = time.time()
         listings = self.search_agent.run(user_input)
 
         if not listings:
-            self.logger.warning("No listings found")
+            print("❌ 검색 결과 없음")
             return self._empty_report(user_input)
 
-        self.logger.info(f"Found {len(listings)} listings")
+        print(f"✅ Step 1. 매물 검색: {len(listings)}건 ({time.time()-step_start:.1f}초)")
 
-        # 2. 단지정보/실거래가 추가 (통근 시간 제외)
+        # 2. 데이터 보강 (단지정보/실거래가)
         if enrich_data:
-            self.logger.info("Step 2: Enriching with complex info & real price...")
+            step_start = time.time()
             try:
                 listings = self.enrich_agent.run(
                     EnrichInput(listings=listings, user_input=user_input)
                 )
+                print(f"✅ Step 2. 데이터 보강: {len(listings)}건 ({time.time()-step_start:.1f}초)")
             except Exception as e:
-                self.logger.warning(f"Enrich failed: {e}")
+                print(f"⚠️ Step 2. 데이터 보강 실패: {e}")
 
         # 3. 데이터 정규화
-        self.logger.info("Step 3: Normalizing data...")
+        step_start = time.time()
+        normalized_count = 0
         for i, listing in enumerate(listings):
             try:
                 listings[i] = self.normalize_agent.run(listing)
-            except Exception as e:
-                self.logger.warning(f"Normalize failed for {listing.id}: {e}")
+                normalized_count += 1
+            except Exception:
+                pass
+        print(f"✅ Step 3. 정규화: {normalized_count}/{len(listings)}건 ({time.time()-step_start:.1f}초)")
 
-        # 4. 기본 조건 필터링 (통근 시간 제외)
-        self.logger.info("Step 4: Filtering listings (basic conditions)...")
+        # 4. 필터링
+        step_start = time.time()
         filter_results = {}
         passed_listings = []
 
-        # 통근 시간 조건 임시 제거
         original_must_conditions = user_input.must_conditions.copy()
         temp_must_conditions = [c for c in user_input.must_conditions if c != "max_commute_minutes"]
         user_input.must_conditions = temp_must_conditions
@@ -103,24 +97,18 @@ class PipelineOrchestrator:
                     FilterInput(listing=listing, user_input=user_input)
                 )
                 filter_results[listing.id] = result
-
                 if result.status != FilterStatus.FAIL:
                     passed_listings.append(listing)
+            except Exception:
+                pass
 
-            except Exception as e:
-                self.logger.error(f"Filter failed for {listing.id}: {e}")
-
-        # 원래 조건 복원
         user_input.must_conditions = original_must_conditions
+        print(f"✅ Step 4. 필터링: {len(passed_listings)}/{len(listings)}건 통과 ({time.time()-step_start:.1f}초)")
 
-        self.logger.info(f"1st filter passed: {len(passed_listings)}/{len(listings)}")
-
-        # 통근 시간 계산 (필터 통과 매물만)
+        # 5. 통근 시간 계산
         commute_results = {}
-
         if user_input.commute_destination and passed_listings:
-            self.logger.info(f"Step 5: Calculating commute time for {len(passed_listings)} passed listings...")
-
+            step_start = time.time()
             try:
                 commute_results = self.commute_agent.run(CommuteInput(
                     listings=passed_listings,
@@ -128,18 +116,12 @@ class PipelineOrchestrator:
                     max_minutes=user_input.max_commute_minutes,
                 ))
 
-                # 통근 시간 조건이 필수인 경우 2차 필터링
                 if "max_commute_minutes" in original_must_conditions and user_input.max_commute_minutes:
                     before_count = len(passed_listings)
-
-                    for listing in passed_listings[:]:  # 복사본 순회
+                    for listing in passed_listings[:]:
                         commute_result = commute_results.get(listing.id)
-
                         if commute_result and not commute_result.passed:
-                            # 통근 시간 초과 → 탈락 처리
                             passed_listings.remove(listing)
-
-                            # 필터 결과 업데이트
                             filter_result = filter_results.get(listing.id)
                             if filter_result:
                                 filter_result.status = FilterStatus.FAIL
@@ -148,42 +130,41 @@ class PipelineOrchestrator:
                                 filter_result.failure_reasons["max_commute_minutes"] = \
                                     f"통근 시간 {minutes}분 > 상한 {user_input.max_commute_minutes}분"
 
-                    self.logger.info(f"2nd filter (commute): {len(passed_listings)}/{before_count}")
-
+                    print(f"✅ Step 5. 통근시간: {len(passed_listings)}/{before_count}건 통과 ({time.time()-step_start:.1f}초)")
+                else:
+                    print(f"✅ Step 5. 통근시간: {len(commute_results)}건 계산 ({time.time()-step_start:.1f}초)")
             except Exception as e:
-                self.logger.warning(f"Commute calculation failed: {e}")
+                print(f"⚠️ Step 5. 통근시간 계산 실패: {e}")
 
-        # 6. Score - 점수화
-        self.logger.info("Step 6: Scoring listings...")
+        # 6. 점수화
+        step_start = time.time()
         score_results = {}
-
         for listing in listings:
             filter_result = filter_results.get(listing.id)
-
-            if skip_filtered and filter_result:
-                if filter_result.status == FilterStatus.FAIL:
-                    continue
-
+            if skip_filtered and filter_result and filter_result.status == FilterStatus.FAIL:
+                continue
             try:
                 result = self.score_agent.run(
                     ScoreInput(listing=listing, user_input=user_input)
                 )
                 score_results[listing.id] = result
-            except Exception as e:
-                self.logger.error(f"Score failed for {listing.id}: {e}")
+            except Exception:
+                pass
+        print(f"✅ Step 6. 점수화: {len(score_results)}건 ({time.time()-step_start:.1f}초)")
 
-        # 7. Risk - 리스크 분석
-        self.logger.info("Step 7: Analyzing risks...")
+        # 7. 리스크 분석
+        step_start = time.time()
         risk_results = {}
         for listing in listings:
             try:
                 result = self.risk_agent.run(listing)
                 risk_results[listing.id] = result
-            except Exception as e:
-                self.logger.error(f"Risk failed for {listing.id}: {e}")
+            except Exception:
+                pass
+        print(f"✅ Step 7. 리스크: {len(risk_results)}건 ({time.time()-step_start:.1f}초)")
 
-        # 8. Question - 질문 생성
-        self.logger.info("Step 8: Generating questions...")
+        # 8. 질문 생성
+        step_start = time.time()
         question_results = {}
         for listing in listings:
             try:
@@ -192,11 +173,12 @@ class PipelineOrchestrator:
                     QuestionInput(listing=listing, risk_result=risk_result)
                 )
                 question_results[listing.id] = result
-            except Exception as e:
-                self.logger.error(f"Question failed for {listing.id}: {e}")
+            except Exception:
+                pass
+        print(f"✅ Step 8. 질문생성: {len(question_results)}건 ({time.time()-step_start:.1f}초)")
 
-        # 9. Report - 최종 리포트 생성
-        self.logger.info("Step 9: Generating report...")
+        # 9. 리포트 생성
+        step_start = time.time()
         report = self.report_agent.run(ReportInput(
             listings=listings,
             user_input=user_input,
@@ -205,17 +187,21 @@ class PipelineOrchestrator:
             risk_results=risk_results,
             question_results=question_results,
         ))
+        print(f"✅ Step 9. 리포트: 완료 ({time.time()-step_start:.1f}초)")
 
-        self.logger.info(
-            f"Pipeline complete: {report.passed_count}/{report.total_count} passed"
-        )
+        # 최종 요약
+        total_time = time.time() - pipeline_start
+        print("\n" + "-" * 60)
+        print("📊 파이프라인 완료")
+        print(f"   전체 매물: {report.total_count}건")
+        print(f"   조건 충족: {report.passed_count}건")
+        print(f"   총 소요시간: {total_time:.1f}초")
+        print("-" * 60 + "\n")
 
         return report
 
     def _empty_report(self, user_input: UserInput) -> Report:
-        """빈 리포트 생성"""
         from datetime import datetime
-
         return Report(
             created_at=datetime.now(),
             total_count=0,

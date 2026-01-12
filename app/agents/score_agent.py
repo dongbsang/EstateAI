@@ -20,17 +20,17 @@ class ScoreInput:
 class ScoreAgent(BaseAgent[ScoreInput, ScoredListing]):
     """
     점수화 Agent
-    
+
     규칙 기반 ScoringEngine을 사용하여 점수를 산정합니다.
     LLM은 사용하지 않습니다.
     """
-    
+
     name = "ScoreAgent"
-    
+
     def __init__(self):
         super().__init__()
         self.engine = ScoringEngine()
-    
+
     def _process(self, input_data: ScoreInput) -> ScoredListing:
         """점수 산정 실행"""
         return self.engine.score(

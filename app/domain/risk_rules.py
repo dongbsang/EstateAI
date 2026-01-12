@@ -190,7 +190,7 @@ class RiskEngine:
         # 구조적 리스크 체크
         risks.extend(self._check_structural_risks(listing))
 
-        # 중복 제거 (같은 카테고리의 같은 제목)
+        # 중복 제거
         seen = set()
         unique_risks = []
         for risk in risks:

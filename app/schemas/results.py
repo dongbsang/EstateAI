@@ -56,7 +56,7 @@ class ScoredListing(BaseModel):
     매물별 점수와 상세 내역을 포함합니다.
     """
     model_config = ConfigDict(use_enum_values=True)
-    
+
     listing_id: str
     listing: Listing
     total_score: float = Field(description="총점 (100점 만점)")
@@ -78,7 +78,7 @@ class RiskLevel(str, Enum):
 class RiskItem(BaseModel):
     """개별 리스크 항목"""
     model_config = ConfigDict(use_enum_values=True)
-    
+
     category: str = Field(
         description="리스크 카테고리",
         examples=["보증보험", "권리관계", "건물상태"]
@@ -151,7 +151,7 @@ class Report(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     total_count: int = Field(description="전체 매물 수")
     passed_count: int = Field(description="조건 통과 매물 수")
-    
+
     # 결과 목록
     top_recommendations: list[ListingReport] = Field(
         default_factory=list,

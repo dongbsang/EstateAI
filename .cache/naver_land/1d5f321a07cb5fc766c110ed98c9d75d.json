@@ -1,0 +1,14 @@
+{
+  "cached_at": "2026-01-12T14:01:19.335657",
+  "params": {
+    "region": "11470",
+    "type": "전세",
+    "property_types": "아파트",
+    "max_deposit": 75000,
+    "min_area": 59.0
+  },
+  "data": [
+    {
+      "id": "naver_2602326380",
+      "source": "네이버부동산",
+      "url": 

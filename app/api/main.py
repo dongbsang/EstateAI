@@ -39,11 +39,6 @@ async def root():
 @app.get("/health")
 async def health():
     """상세 헬스 체크"""
-    from app.llm import get_llm_runner
-
-    llm = get_llm_runner()
-
     return {
         "status": "healthy",
-        "llm_available": llm.is_available,
     }

@@ -1,11 +1,12 @@
-"""
+﻿"""
 ODsay 대중교통 길찾기 API 클라이언트
 출퇴근 시간 계산에 사용합니다.
 """
 
-import os
 from typing import Optional
 from loguru import logger
+
+from app.config import settings
 import httpx
 
 
@@ -21,11 +22,11 @@ class ODsayClient:
     - ODSAY_API_KEY: ODsay API 키
     """
 
-    BASE_URL = "https://api.odsay.com/v1/api"
+    BASE_URL = settings.ODSAY_BASE_URL
 
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("ODSAY_API_KEY", "")
-        self.client = httpx.Client(timeout=30.0)
+        self.api_key = api_key or settings.ODSAY_API_KEY
+        self.client = httpx.Client(timeout=settings.ODSAY_TIMEOUT)
         self.logger = logger.bind(source="ODsay")
 
         if not self.api_key:
@@ -101,37 +102,11 @@ class ODsayClient:
                 "payment": info.get("payment", 0),
                 "path_type": self._get_path_type(best_path.get("pathType")),
             }
-            
+
         except Exception as e:
             self.logger.error(f"Transit route error: {e}")
             return None
-    
-    def get_commute_time(
-        self,
-        home_lat: float,
-        home_lng: float,
-        office_lat: float,
-        office_lng: float,
-    ) -> Optional[int]:
-        """
-        출퇴근 시간 계산 (분)
-        
-        Args:
-            home_lat: 집 위도
-            home_lng: 집 경도
-            office_lat: 회사 위도
-            office_lng: 회사 경도
-            
-        Returns:
-            총 소요시간 (분), 실패 시 None
-        """
-        result = self.get_transit_route(home_lat, home_lng, office_lat, office_lng)
-        
-        if result:
-            return result["total_time"]
-        
-        return None
-    
+
     def _get_path_type(self, path_type: int) -> str:
         """경로 유형 변환"""
         types = {
@@ -140,13 +115,13 @@ class ODsayClient:
             3: "지하철+버스",
         }
         return types.get(path_type, "기타")
-    
+
     def close(self):
         self.client.close()
-    
+
     def __enter__(self):
         return self
-    
+
     def __exit__(self, *args):
         self.close()
 
@@ -175,7 +150,7 @@ STATION_COORDS = {
     "구로디지털단지역": {"lat": 37.4852, "lng": 126.9015},
     "판교역": {"lat": 37.3947, "lng": 127.1112},
     "정자역": {"lat": 37.3662, "lng": 127.1085},
-    
+
     # 추가 역
     "서울역": {"lat": 37.5547, "lng": 126.9707},
     "용산역": {"lat": 37.5299, "lng": 126.9648},
@@ -194,5 +169,5 @@ def get_station_coords(station_name: str) -> Optional[dict]:
     # "역" 접미사 처리
     if not station_name.endswith("역"):
         station_name = station_name + "역"
-    
+
     return STATION_COORDS.get(station_name)
